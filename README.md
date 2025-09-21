@@ -19,14 +19,14 @@
 ## デモ画面
 
 ### スタート画面
-![スタート画面](HowManyBallAreLeft/start_screen.png)
-![レベル設定画面](HowManyBallAreLeft/level_setting.png)
+![スタート画面](start_screen.png)
+![レベル設定画面](level_setting.png)
 
 ### プレイ画面
-![プレイ画面](HowManyBallAreLeft/play_screen.gif)
+![プレイ画面](play_screen.gif)
 
 ### 結果画面
-![結果画面](HowManyBallAreLeft/result_screen.png)
+![結果画面](result_screen.png)
 
 ---
 
