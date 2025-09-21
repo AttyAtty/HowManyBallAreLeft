@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>立体感のある回転立方体</title>
+  <style>
+    body { margin: 0; background: #f0f8ff; }
+    canvas { display: block; margin: auto; background: #ffffff; }
+  </style>
+</head>
+<body>
+<canvas id="cubeCanvas" width="500" height="500"></canvas>
+<script>
+  const canvas = document.getElementById("cubeCanvas");
+  const ctx = canvas.getContext("2d");
+
+  const cubeSize = 100;
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+
+  let angle = 0;
+
+  const vertices = [
+    {x: -1, y: -1, z: -1},
+    {x:  1, y: -1, z: -1},
+    {x:  1, y:  1, z: -1},
+    {x: -1, y:  1, z: -1},
+    {x: -1, y: -1, z:  1},
+    {x:  1, y: -1, z:  1},
+    {x:  1, y:  1, z:  1},
+    {x: -1, y:  1, z:  1}
+  ];
+
+  const faces = [
+    [0,1,2,3], // back
+    [4,5,6,7], // front
+    [0,1,5,4], // bottom
+    [2,3,7,6], // top
+    [1,2,6,5], // right
+    [0,3,7,4]  // left
+  ];
+
+  const lightDir = {x: -1, y: -1, z: 1};
+
+  function normalize(v) {
+    const len = Math.hypot(v.x, v.y, v.z);
+    return {x: v.x / len, y: v.y / len, z: v.z / len};
+  }
+
+  function dot(a, b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+  }
+
+  function cross(a, b) {
+    return {
+      x: a.y * b.z - a.z * b.y,
+      y: a.z * b.x - a.x * b.z,
+      z: a.x * b.y - a.y * b.x
+    };
+  }
+
+  function subtract(a, b) {
+    return {x: a.x - b.x, y: a.y - b.y, z: a.z - b.z};
+  }
+
+  function rotateX(p, angle) {
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+    return {
+      x: p.x,
+      y: p.y * cos - p.z * sin,
+      z: p.y * sin + p.z * cos
+    };
+  }
+
+  function rotateY(p, angle) {
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+    return {
+      x: p.x * cos - p.z * sin,
+      y: p.y,
+      z: p.x * sin + p.z * cos
+    };
+  }
+
+  function project(p) {
+    const scale = 300 / (p.z + 400);
+    return {
+      x: centerX + p.x * scale,
+      y: centerY + p.y * scale
+    };
+  }
+
+  function shadeColor(baseColor, shadeFactor) {
+    // 減光（青色ベース）
+    const base = { r: 100, g: 149, b: 237 }; // cornflowerblue
+    const factor = Math.min(Math.max(shadeFactor, 0), 1);
+    const r = Math.floor(base.r * factor);
+    const g = Math.floor(base.g * factor);
+    const b = Math.floor(base.b * factor);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  function drawCube() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const rotated = vertices.map(v => rotateY(rotateX(v, angle), angle));
+    const projected = rotated.map(v => project({
+      x: v.x * cubeSize,
+      y: v.y * cubeSize,
+      z: v.z * cubeSize
+    }));
+
+    const light = normalize(lightDir);
+
+    const faceDepths = faces.map(face => {
+      const avgZ = face.reduce((sum, i) => sum + rotated[i].z, 0) / 4;
+        return { face, z: avgZ };
+    }).sort((a, b) => b.z - a.z);
+
+    faceDepths.forEach(({ face }) => {
+        const v0 = rotated[face[0]];
+        const v1 = rotated[face[1]];
+        const v2 = rotated[face[2]];
+        const edge1 = subtract(v1, v0);
+        const edge2 = subtract(v2, v0);
+        const baseNormal = normalize(cross(edge1, edge2));
+
+      // 2. 現在の回転を適用
+        const rotatedNormal = normalize(rotateNormal(baseNormal, angle, angle));
+
+      // 3. 光との内積
+        const brightness = dot(rotatedNormal, light);
+
+      const color = shadeColor("#6495ED", brightness * 0.6 + 0.4);
+
+        ctx.beginPath();
+        ctx.moveTo(projected[face[0]].x, projected[face[0]].y);
+        for (let i = 1; i < face.length; i++) {
+            ctx.lineTo(projected[face[i]].x, projected[face[i]].y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = "#333";
+        ctx.stroke();
+    });
+  }
+
+  function animate() {
+    angle += 0.01;
+    drawCube();
+    requestAnimationFrame(animate);
+  }
+
+  animate();
+</script>
+</body>
+</html>

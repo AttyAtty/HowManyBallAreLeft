@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ボールの個数当てゲーム</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; background: #f0f0f0; }
+    canvas { background: #fff; display: block; margin: 20px auto; border: 2px solid #333; }
+    button { font-size: 18px; margin: 5px; padding: 10px 20px; }
+    .hidden { display: none; }
+    #message { font-size: 24px; margin-top: 20px; }
+    #overlay-symbol {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 100px;
+      font-weight: bold;
+      display: none;
+      z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+  <h1>ボールの個数当てゲーム</h1>
+  <div id="start-screen">
+    <button onclick="startGame()">ゲーム開始</button>
+    <button onclick="setDifficulty(3)">かんたん（3個）</button>
+    <button onclick="setDifficulty(5)">ふつう（5個）</button>
+    <button onclick="setDifficulty(7)">むずかしい（7個）</button>
+    <p id="difficulty-label">選択中：ふつう（5個）</p>
+    <canvas id="start-animation" width="400" height="300"></canvas>
+  </div>
+
+  <div id="game-screen" class="hidden">
+    <canvas id="game-canvas" width="400" height="300"></canvas>
+    <div id="choices"></div>
+    <p id="message"></p>
+    <div id="overlay-symbol"></div>
+  </div>
+
+  <div id="result-screen" class="hidden">
+    <h2>結果発表！</h2>
+    <p id="score"></p>
+    <p id="result-message"></p>
+    <button onclick="restartGame()">スタート画面へ</button>
+  </div>
+
+  <audio id="bgm" src="https://example.com/bgm.mp3" loop></audio>
+  <audio id="correct-sound" src="https://example.com/correct.mp3"></audio>
+  <audio id="wrong-sound" src="https://example.com/wrong.mp3"></audio>
+
+  <script>
+    const startScreen = document.getElementById('start-screen');
+    const gameScreen = document.getElementById('game-screen');
+    const resultScreen = document.getElementById('result-screen');
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    const choicesDiv = document.getElementById('choices');
+    const message = document.getElementById('message');
+    const scoreDisplay = document.getElementById('score');
+    const resultMessage = document.getElementById('result-message');
+    const overlaySymbol = document.getElementById('overlay-symbol');
+    const bgm = document.getElementById('bgm');
+    const correctSound = document.getElementById('correct-sound');
+    const wrongSound = document.getElementById('wrong-sound');
+
+    let totalRounds = 10;
+    let currentRound = 0;
+    let difficulty = 5;
+    let correctCount = 0;
+    let ballCount = 5;
+    let hiddenCount = 0;
+
+    function setDifficulty(n) {
+      difficulty = n;
+      document.getElementById('difficulty-label').textContent = `選択中：${n === 3 ? 'かんたん' : n === 5 ? 'ふつう' : 'むずかしい'}（${n}個）`;
+    }
+
+    function startGame() {
+      currentRound = 0;
+      correctCount = 0;
+      startScreen.classList.add('hidden');
+      resultScreen.classList.add('hidden');
+      gameScreen.classList.remove('hidden');
+      bgm.play();
+      nextRound();
+    }
+
+    function nextRound() {
+      currentRound++;
+      ballCount = difficulty;
+      hiddenCount = Math.floor(Math.random() * ballCount);
+      const visibleCount = ballCount - hiddenCount;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      animateBallsIntoBox(ballCount, () => {
+        drawBox();
+        setTimeout(() => {
+          shakeBox(() => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBox(true);
+            animateBallsOutOfBox(visibleCount, () => {
+              showChoices();
+            });
+          });
+        }, 800);
+      });
+    }
+
+    function animateBallsIntoBox(n, callback) {
+      let frame = 0;
+      const positions = Array.from({ length: n }, (_, i) => ({ x: 100 + i * 40, y: 0 }));
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        positions.forEach(pos => {
+          if (pos.y < 100) pos.y += 5;
+          drawBall(pos.x, pos.y);
+        });
+        if (positions[0].y < 100) requestAnimationFrame(animate);
+        else callback();
+      }
+      animate();
+    }
+
+    function animateBallsOutOfBox(n, callback) {
+      let frame = 0;
+      const positions = Array.from({ length: n }, (_, i) => ({ x: 300 + i * 30, y: 200 }));
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBox(true);
+        let done = true;
+        positions.forEach(pos => {
+          if (pos.y > 100) {
+            pos.y -= 5;
+            done = false;
+          }
+          drawBall(pos.x, pos.y);
+        });
+        if (!done) requestAnimationFrame(animate);
+        else callback();
+      }
+      animate();
+    }
+
+    function drawBalls(n, startX = 100) {
+      for (let i = 0; i < n; i++) {
+        drawBall(startX + i * 40, 100);
+      }
+    }
+
+    function drawBall(x, y) {
+      const gradient = ctx.createRadialGradient(x - 5, y - 5, 5, x, y, 20);
+      gradient.addColorStop(0, 'white');
+      gradient.addColorStop(1, 'red');
+      ctx.beginPath();
+      ctx.arc(x, y, 20, 0, Math.PI * 2);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      ctx.strokeStyle = 'darkred';
+      ctx.stroke();
+    }
+
+    function drawBox(openLeft = false) {
+      const x = 80, y = 120, w = 240, h = 80;
+
+      ctx.fillStyle = '#8B4513';
+      ctx.fillRect(x, y, w, h);
+
+      ctx.fillStyle = '#A0522D';
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + 10, y - 10);
+      ctx.lineTo(x + w + 10, y - 10);
+      ctx.lineTo(x + w, y);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#5C3317';
+      ctx.beginPath();
+      ctx.moveTo(x + w, y);
+      ctx.lineTo(x + w + 10, y - 10);
+      ctx.lineTo(x + w + 10, y + h - 10);
+      ctx.lineTo(x + w, y + h);
+      ctx.closePath();
+      ctx.fill();
+
+      if (openLeft) {
+        ctx.clearRect(x, y, w / 2, h);
+      }
+
+      ctx.strokeStyle = 'black';
+      ctx.strokeRect(x, y, w, h);
+    }
+
+    function shakeBox(callback) {
+      let count = 0;
+      const interval = setInterval(() => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(Math.random() * 6 - 3, Math.random() * 6 - 3);
+        drawBox();
+        ctx.restore();
+        count++;
+        if (count > 10) {
+          clearInterval(interval);
+          callback();
+        }
+      }, 50);
+    }
+
+    function showChoices() {
+      choicesDiv.innerHTML = '';
+      const options = shuffle([hiddenCount, hiddenCount + 1, hiddenCount + 2, hiddenCount + 3].filter(n => n <= ballCount));
+      options.forEach(n => {
+        const btn = document.createElement('button');
+        btn.textContent = `${n}個`;
+        btn.onclick = () => handleAnswer(n);
+        choicesDiv.appendChild(btn);
+      });
+      message.textContent = '箱の左に残っているボールの数は？';
+    }
+
+    function handleAnswer(answer) {
+      overlaySymbol.style.display = 'block';
+      if (answer === hiddenCount) {
+        message.textContent = '正解！';
+        correctCount++;
+        correctSound.play();
+        overlaySymbol.textContent = '〇';
+        overlaySymbol.style.color = 'red';
+      } else {
+        message.textContent = '不正解...';
+        wrongSound.play();
+        overlaySymbol.textContent = '×';
+        overlaySymbol.style.color = 'blue';
+      }
+      setTimeout(() => {
+        overlaySymbol.style.display = 'none';
+        if (currentRound >= totalRounds) showResult();
+        else nextRound();
+      }, 1200);
+    }
+
+    function showResult() {
+      gameScreen.classList.add('hidden');
+      resultScreen.classList.remove('hidden');
+      bgm.pause();
+      bgm.currentTime = 0;
+
+      const score = 100 - (totalRounds - correctCount) * 5;
+      scoreDisplay.textContent = `あなたの得点は ${score} 点です！`;
+
+      if (score >= 90) {
+        resultMessage.textContent = '花丸！すばらしい！';
+      } else if (score >= 70) {
+        resultMessage.textContent = '〇 よくできました！';
+      } else {
+        resultMessage.textContent = '二重丸 次はもっとがんばろう！';
+      }
+    }
+
+    function restartGame() {
+      resultScreen.classList.add('hidden');
+      startScreen.classList.remove('hidden');
+    }
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    const startCanvas = document.getElementById('start-animation');
+    const startCtx = startCanvas.getContext('2d');
+    let startFrame = 0;
+    function startAnim() {
+      startCtx.clearRect(0, 0, startCanvas.width, startCanvas.height);
+      const y = 150 + Math.sin(startFrame * 0.1) * 10;
+      const gradient = startCtx.createRadialGradient(197, y - 3, 2, 200, y, 20);
+      gradient.addColorStop(0, 'white');
+      gradient.addColorStop(1, 'red');
+      startCtx.beginPath();
+      startCtx.arc(200, y, 20, 0, Math.PI * 2);
+      startCtx.fillStyle = gradient;
+      startCtx.fill();
+      startCtx.strokeStyle = 'darkred';
+      startCtx.stroke();
+      startFrame++;
+      requestAnimationFrame(startAnim);
+    }
+    startAnim();
+  </script>
+</body>
+</html>
