@@ -327,7 +327,7 @@
   </div>
 
   <div id="game-screen" class="hidden">
-    <div id="ball-count-display" class="ball-count-info">5このボールを入れるよ</div>
+    <div id="ball-count-display" class="ball-count-info">5この ボールを いれるよ</div>
     <canvas id="game-canvas" width="600" height="450"></canvas>
     <p id="message"></p>
     <div id="choices"></div>
@@ -401,7 +401,7 @@
     const wrongSound = document.getElementById('wrong-sound');
     const cheerSound = document.getElementById('cheer-sound');
 
-    let totalRounds = 10;
+    let totalRounds = 5;
     let currentRound = 0;
     let difficulty = 5;
     let correctCount = 0;
@@ -477,90 +477,208 @@
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
+      // 前のラウンドの要素をクリア
+      choicesDiv.innerHTML = '';
+      message.textContent = '';
+      
       // 個数を表示・音声案内
       showBallCount(ballCount);
       
-      // 3秒待ってからボールを1秒間表示し、その後アニメーション開始
+      // 3秒待ってからボールを順々に表示し、ボタンも表示
       setTimeout(() => {
-        // まずボールを1秒間表示
+        // ボールを順々に表示
         setHoleVisibility(false, false);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         drawBox();
-        // animateBallsIntoBoxの開始位置と同じに揃える
-        const w = 360, h = 180;
-        const x = (canvas.width - w) / 2;
-        const y = (canvas.height - h) / 2;
-        const gap = 56;
-        const startX = x + w / 2 - ((ballCount - 1) * gap) / 2;
-        const baseY = 30; // animateBallsIntoBoxの初期y
-        for (let i = 0; i < ballCount; i++) {
-          drawBall(startX + i * gap, baseY);
-        }
-        setTimeout(() => {
-          setHoleVisibility(true, false); // 上面穴のみ表示
-          animateBallsIntoBox(ballCount, () => {
-            setHoleVisibility(false, false); // 両方非表示
-            drawBox();
-            setTimeout(() => {
-              shakeBox(() => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                setHoleVisibility(false, true); // 正面穴のみ表示
-                drawBox();
-                drawBallsInsideBox(hiddenCount);
-                animateBallsOutOfBox(visibleCount, () => {
-                  setHoleVisibility(false, false); // 両方非表示
-                  showChoices();
+        
+        // ボールを順々に表示するアニメーション
+        animateBallsAppearing(ballCount, () => {
+          // 全てのボールが表示された後にボタンを表示
+          showPutBallsButton(() => {
+            // ボタンクリック時の処理
+            hidePutBallsButton();
+            
+            setHoleVisibility(true, false); // 上面穴のみ表示
+            animateBallsIntoBox(ballCount, () => {
+              setHoleVisibility(false, false); // 両方非表示
+              drawBox();
+              setTimeout(() => {
+                shakeBox(() => {
+                  ctx.clearRect(0, 0, canvas.width, canvas.height);
+                  setHoleVisibility(false, true); // 正面穴のみ表示
+                  drawBox();
+                  drawBallsInsideBox(hiddenCount);
+                  animateBallsOutOfBox(visibleCount, () => {
+                    setHoleVisibility(false, false); // 両方非表示
+                    showChoices();
+                  });
                 });
-              });
-            }, 800);
+              }, 800);
+            });
           });
-        }, 1000); // 1秒間ボールを表示
-      }, 3200); // 個数表示が消える少し後にアニメーション開始
+        });
+      }, 3200); // 個数表示が消える少し後にボールアニメーション開始
     }
 
-    function animateBallsIntoBox(n, callback) {
-      // ボールが箱の上面中央の穴に吸い込まれるように
-      ballCount = difficulty;
+    // ボールを順々に表示するアニメーション関数
+    function animateBallsAppearing(n, callback) {
       const w = 360, h = 180;
       const x = (canvas.width - w) / 2;
       const y = (canvas.height - h) / 2;
-      const holeX = x + w / 2;
-      const holeY = y - 25;
-      const gap = 48;
-      const startX = x + w / 2 - ((ballCount - 1) * gap) / 2;
-      const positions = Array.from({ length: n }, (_, i) => ({ x: startX + i * gap, y: 30, phase: 0 }));
-      let arrived = 0;
-      function animate() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawBox();
-        positions.forEach((pos, i) => {
-          if (pos.phase === 0) {
-            // 横から穴の上まで移動（ゆっくり）
-            if (Math.abs(pos.x - holeX) > 2) {
-              pos.x += (holeX - pos.x) * 0.08;
-            } else {
-              pos.x = holeX;
-              pos.phase = 1;
-            }
+      const gap = 56;
+      const startX = x + w / 2 - ((n - 1) * gap) / 2;
+      const baseY = 30;
+      
+      let currentBall = 0;
+      
+      function showNextBall() {
+        if (currentBall < n) {
+          // 現在のキャンバスをクリアして箱を再描画
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          drawBox();
+          
+          // これまでに表示したボールを全て描画
+          for (let i = 0; i <= currentBall; i++) {
+            drawBall(startX + i * gap, baseY);
           }
-          if (pos.phase === 1) {
-            // 穴の上から下へ落ちる（ゆっくり）
-            if (pos.y < holeY) {
-              pos.y += 3;
-            } else {
-              pos.y = holeY;
-              pos.phase = 2;
-              arrived++;
-            }
-          }
-          if (pos.phase < 2) {
-            drawBall(pos.x, pos.y);
-          }
-        });
-        if (arrived < n) requestAnimationFrame(animate);
-        else setTimeout(callback, 300);
+          
+          currentBall++;
+
+          // 次のボールを1秒後に表示（ゆっくり）
+          setTimeout(showNextBall, 1500);
+        } else {
+          // 全てのボールが表示されたらコールバックを実行
+          setTimeout(callback, 500);
+        }
       }
-      animate();
+      
+      // 最初のボールから開始
+      showNextBall();
+    }
+
+    // ボールを箱に入れるボタンを表示する関数
+function showPutBallsButton(callback) {
+  // 既存のボタンがあれば削除
+  const existingBtn = document.getElementById('put-balls-btn');
+  if (existingBtn) {
+    existingBtn.remove();
+  }
+  
+  // ボタンを作成
+  const button = document.createElement('button');
+  button.id = 'put-balls-btn';
+  button.textContent = 'ボールを はこに いれる';
+  button.style.fontSize = '28px';
+  button.style.margin = '20px auto';
+  button.style.padding = '15px 30px';
+  button.style.border = 'none';
+  button.style.borderRadius = '15px';
+  button.style.background = 'linear-gradient(45deg, #FF6B6B, #FF8E53)';
+  button.style.color = 'white';
+  button.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+  button.style.cursor = 'pointer';
+  button.style.fontWeight = 'bold';
+  button.style.display = 'block'; // ブロック要素として中央配置
+  
+  // ホバー効果
+  button.addEventListener('mouseenter', () => {
+    button.style.background = 'linear-gradient(45deg, #FF8E53, #FF6B6B)';
+    button.style.transform = 'translateY(-2px)';
+    button.style.boxShadow = '0 6px 12px rgba(0,0,0,0.3)';
+  });
+  
+  button.addEventListener('mouseleave', () => {
+    button.style.background = 'linear-gradient(45deg, #FF6B6B, #FF8E53)';
+    button.style.transform = 'translateY(0)';
+    button.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+  });
+  
+  // クリックイベント
+  button.addEventListener('click', () => {
+    playClick();
+    callback();
+  });
+  
+  // canvasの直後、messageの前に挿入
+  const canvas = document.getElementById('game-canvas');
+  const message = document.getElementById('message');
+  gameScreen.insertBefore(button, message);
+}
+
+// ボールを箱に入れるボタンを非表示にする関数
+function hidePutBallsButton() {
+  const button = document.getElementById('put-balls-btn');
+  if (button) {
+    button.remove();
+  }
+}
+
+    function animateBallsIntoBox(n, callback) {
+      // ボールが箱の上面中央の穴に一つずつ順番に入るアニメーション
+      const w = 360, h = 180;
+      const x = (canvas.width - w) / 2;
+      const y = (canvas.height - h) / 2;
+      const holeX = x + w / 2; // 穴のX座標（右にずらす）
+      const holeY = y - 25; // 穴のY座標
+      const gap = 56;
+      const startX = x + w / 2 - ((n - 1) * gap) / 2;
+      const baseY = 30;
+      
+      // 全ボールの初期位置を保存
+      const ballPositions = Array.from({ length: n }, (_, i) => ({
+        x: startX + i * gap,
+        y: baseY,
+        moving: false,
+        finished: false
+      }));
+      
+      let currentBallIndex = 0; // 現在動いているボールのインデックス
+      
+      function animateCurrentBall() {
+        if (currentBallIndex >= n) {
+          // 全てのボールが穴に入ったら完了
+          setTimeout(callback, 300);
+          return;
+        }
+        
+        const currentBall = ballPositions[currentBallIndex];
+        currentBall.moving = true;
+        
+        function moveBall() {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          drawBox();
+          
+          // 全てのボールを描画（完了したボール以外）
+          ballPositions.forEach((ball, i) => {
+            if (!ball.finished) {
+              drawBall(ball.x, ball.y);
+            }
+          });
+          
+          // 現在のボールを穴に向かって移動
+          const deltaX = holeX - currentBall.x;
+          const deltaY = holeY - currentBall.y;
+          
+          if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+            // まだ穴に到達していない場合、移動を続ける
+            currentBall.x += deltaX * 0.05; // 水平移動
+            currentBall.y += deltaY * 0.04; // 垂直移動
+            requestAnimationFrame(moveBall);
+          } else {
+            // 穴に到達したら次のボールへ
+            currentBall.finished = true;
+            currentBallIndex++;
+            
+            // 少し間隔を空けてから次のボールを動かす
+            setTimeout(animateCurrentBall, 200);
+          }
+        }
+        
+        moveBall();
+      }
+      
+      // 最初のボールから開始
+      animateCurrentBall();
     }
 
     function animateBallsOutOfBox(n, callback) {
@@ -594,7 +712,7 @@
               drawBox();
               positions.forEach(p => drawBall(p.x, p.y));
               if (Math.abs(xBall - targetX) > 2) {
-                xBall += (targetX - xBall) * 0.18;
+                xBall += (targetX - xBall) * 0.09;
                 drawBall(xBall, yBall);
                 requestAnimationFrame(moveSide);
               } else {
@@ -770,7 +888,7 @@
         };
         choicesDiv.appendChild(btn);
       });
-      message.innerHTML = 'はこのなかにのこっている<br>ボールのかずは？';
+      message.innerHTML = 'はこのなかに のこっている<br>ボールのかずは？';
     }
 
     function handleAnswer(answer) {
@@ -800,6 +918,10 @@
   document.getElementById('main-title').style.display = 'none';
   message.textContent = '';
   message.style.display = 'none'; // 結果発表時は「残りはなんこ？」を非表示
+  
+  // ボールを入れるボタンを削除
+  hidePutBallsButton();
+  
   // 選択肢ボタンの状態リセット
   const allBtns = choicesDiv.querySelectorAll('button');
   allBtns.forEach(b => {
@@ -810,7 +932,7 @@
   bgmGame.pause();
   bgmGame.currentTime = 0;
 
-  const score = 100 - (totalRounds - correctCount) * 5;
+  const score = 100 - (totalRounds - correctCount) * 10;
   scoreDisplay.innerHTML = `あなたのとくてんは<br><span class="score-big">${score} てん!</span>`;
 
   const resultSymbol = document.getElementById('result-symbol');
@@ -1010,6 +1132,10 @@ voiceToggle.addEventListener('change', () => {
 pauseBtn.addEventListener('click', () => {
   settingsModal.classList.add('hidden');
   gameScreen.classList.add('hidden');
+  
+  // ボールを入れるボタンを削除
+  hidePutBallsButton();
+  
   showStartScreen();
   bgmGame.pause();
   bgmStart.play();
